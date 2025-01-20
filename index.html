@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="main.css">
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1 class="card-title">زي الماريونيت</h1>
+      
+      <div class="wheel-container">
+        <div class="wheel-border"></div>
+        <svg class="wheel" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="5" fill="white" stroke="rgb(8, 0, 112)" stroke-width="2"/>
+        </svg>
+        <div class="pointer"></div>
+      </div>
+
+      <div class="balance">Balance: $<span id="balance">100</span></div>
+      
+      <div class="chances">
+        <h3>Chances Left</h3>
+        <p><span id="chances-left">2</span> / 2</p>
+      </div>
+
+      <div class="number-grid" id="number-grid"></div>
+
+      <div class="message" id="message" dir="rtl"></div>
+
+      <div class="action-buttons">
+        <button class="action-btn spin-btn" id="spin-btn">Spin the Wheel</button>
+        <button class="action-btn reset-btn" id="reset-btn">Reset Game</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const colors = [
+      'rgba(144, 0, 0, 0.9)',
+      'rgba(8, 0, 112, 0.9)',
+      'rgba(144, 0, 0, 0.8)',
+      'rgba(8, 0, 112, 0.8)',
+      'rgba(144, 0, 0, 0.7)',
+      'rgba(8, 0, 112, 0.7)',
+      'rgba(144, 0, 0, 0.6)',
+      'rgba(8, 0, 112, 0.6)',
+      'rgba(144, 0, 0, 0.5)',
+      'rgba(8, 0, 112, 0.5)'
+    ];
+
+    let state = {
+      rotation: 0,
+      isSpinning: false,
+      balance: 100,
+      selectedNumber: null,
+      chancesUsed: 0
+    };
+
+    // Initialize wheel segments
+    const wheel = document.querySelector('.wheel');
+    const createSlicePath = (startAngle, endAngle) => {
+      const centerX = 50;
+      const centerY = 50;
+      const radius = 35;
+      const startRad = (startAngle - 90) * Math.PI / 180;
+      const endRad = (endAngle - 90) * Math.PI / 180;
+      const startX = centerX + radius * Math.cos(startRad);
+      const startY = centerY + radius * Math.sin(startRad);
+      const endX = centerX + radius * Math.cos(endRad);
+      const endY = centerY + radius * Math.sin(endRad);
+      const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+      return `M ${centerX},${centerY} L ${startX},${startY} A ${radius},${radius} 0 ${largeArcFlag} 1 ${endX},${endY} Z`;
+    };
+
+    // Create wheel segments
+    for (let i = 0; i < 10; i++) {
+      const startAngle = i * 36;
+      const endAngle = (i + 1) * 36;
+      const textAngle = (startAngle + endAngle) / 2 - 90;
+      const textRadius = 25;
+      const textX = 50 + textRadius * Math.cos(textAngle * Math.PI / 180);
+      const textY = 50 + textRadius * Math.sin(textAngle * Math.PI / 180);
+
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", createSlicePath(startAngle, endAngle));
+      path.setAttribute("fill", colors[i]);
+      path.setAttribute("stroke", "white");
+      path.setAttribute("stroke-width", "1");
+      g.appendChild(path);
+
+      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      circle.setAttribute("cx", textX);
+      circle.setAttribute("cy", textY);
+      circle.setAttribute("r", "8");
+      circle.setAttribute("fill", "white");
+      circle.setAttribute("stroke", colors[i]);
+      circle.setAttribute("stroke-width", "1");
+      g.appendChild(circle);
+
+      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      text.setAttribute("x", textX);
+      text.setAttribute("y", textY + 3);
+      text.setAttribute("text-anchor", "middle");
+      text.setAttribute("fill", i % 2 === 0 ? "rgb(144, 0, 0)" : "rgb(8, 0, 112)");
+      text.setAttribute("font-size", "10");
+      text.setAttribute("font-weight", "bold");
+      text.textContent = i;
+      g.appendChild(text);
+
+      wheel.appendChild(g);
+    }
+
+    // Create number buttons
+    const numberGrid = document.getElementById('number-grid');
+    for (let i = 0; i < 10; i++) {
+      const button = document.createElement('button');
+      button.className = 'number-btn';
+      button.textContent = i;
+      button.onclick = () => selectNumber(i);
+      numberGrid.appendChild(button);
+    }
+
+    function selectNumber(number) {
+      if (state.isSpinning || state.chancesUsed >= 2) return;
+      
+      state.selectedNumber = number;
+      document.querySelectorAll('.number-btn').forEach((btn, i) => {
+        btn.classList.toggle('selected', i === number);
+      });
+      updateSpinButton();
+    }
+
+    function updateUI() {
+      document.getElementById('balance').textContent = state.balance;
+      document.getElementById('chances-left').textContent = 2 - state.chancesUsed;
+      wheel.style.transform = `rotate(${state.rotation}deg)`;
+      updateSpinButton();
+    }
+
+    function updateSpinButton() {
+      const spinBtn = document.getElementById('spin-btn');
+      spinBtn.disabled = state.isSpinning || state.chancesUsed >= 2 || state.selectedNumber === null;
+      spinBtn.textContent = state.isSpinning ? 'Spinning...' : 'Spin the Wheel';
+    }
+
+    function showMessage(text) {
+      const message = document.getElementById('message');
+      message.textContent = text;
+      message.classList.toggle('visible', !!text);
+    }
+
+    function calculateRotationForNumber(number) {
+      const baseSpins = 5 * 360;
+      const anglePerSegment = 360 / 10;
+      const targetAngle = (10 - number) * anglePerSegment;
+      return baseSpins + targetAngle;
+    }
+
+    function spinWheel() {
+      if (state.isSpinning || state.selectedNumber === null || state.chancesUsed >= 2) return;
+
+      state.isSpinning = true;
+      const currentBet = state.chancesUsed === 0 ? 100 : 200;
+      state.balance -= currentBet;
+
+      if (state.chancesUsed === 0) {
+        // First spin - guaranteed win
+        const targetRotation = calculateRotationForNumber(state.selectedNumber);
+        state.rotation += targetRotation;
+        
+        setTimeout(() => {
+          state.isSpinning = false;
+          state.balance += currentBet * 2;
+          state.chancesUsed = 1;
+          showMessage("ربحت! جرب حظك تاني!");
+          updateUI();
+        }, 3000);
+      } else {
+        // Second spin - guaranteed loss
+        const losingNumber = (state.selectedNumber + 5) % 10;
+        const targetRotation = calculateRotationForNumber(losingNumber);
+        state.rotation += targetRotation;
+        
+        setTimeout(() => {
+          state.isSpinning = false;
+          state.chancesUsed = 2;
+          showMessage("ده دايمًا اللي بيحصل في الآخر مع القمار - فلوسك بتضيع والنهاية دايمًا خسارة.");
+          updateUI();
+        }, 3000);
+      }
+
+      updateUI();
+    }
+
+    function resetGame() {
+      if (state.isSpinning) return;
+      
+      state = {
+        rotation: 0,
+        isSpinning: false,
+        balance: 100,
+        selectedNumber: null,
+        chancesUsed: 0
+      };
+
+      document.querySelectorAll('.number-btn').forEach(btn => {
+        btn.classList.remove('selected');
+      });
+      
+      showMessage("");
+      updateUI();
+    }
+
+    document.getElementById('spin-btn').onclick = spinWheel;
+    document.getElementById('reset-btn').onclick = resetGame;
+
+    updateUI();
+  </script>
+</body>
+</html>`
