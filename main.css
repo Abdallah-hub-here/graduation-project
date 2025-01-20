@@ -9,6 +9,7 @@
       display: flex;
       justify-content: center;
       align-items: center;
+      padding: 20px;
     }
 
     .container {
@@ -194,7 +195,12 @@
     .reset-btn {
       background: rgb(75, 85, 99);
     }
+
         @media (max-width: 1000px) {
+              body {
+      align-items: start;
+      padding-top:100px ;
+    }
 
             .pointer::before {
                 width: 64px;
